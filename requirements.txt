@@ -8,3 +8,6 @@ Pillow==10.3.0
 numpy==1.26.4
 pandas==2.2.2
 plotly==5.22.0
+streamlit-webrtc==0.64.5
+av==16.1.0
+aiortc==1.14.0
