@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
@@ -76,8 +77,22 @@ def show_registration():
         submitted  = st.form_submit_button("Start Interview 🚀")
 
     if submitted:
+        # ── Validation ────────────────────────────────────────
         if not name or not email:
-            st.error("Please fill in all fields!")
+            st.error("⚠️ Please fill in all fields!")
+            return
+
+        if len(name.strip()) < 2:
+            st.error("⚠️ Name must be at least 2 characters.")
+            return
+
+        if not re.match(r"^[A-Za-z\s]+$", name.strip()):
+            st.error("⚠️ Name should only contain letters and spaces.")
+            return
+
+        email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w{2,}$"
+        if not re.match(email_pattern, email.strip()):
+            st.error("⚠️ Please enter a valid email address (e.g. name@example.com)")
             return
 
         with st.spinner("🤖 AI is generating your questions..."):
