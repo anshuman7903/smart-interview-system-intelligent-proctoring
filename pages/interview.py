@@ -9,7 +9,7 @@ import cv2
 import av
 import time
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-from modules.question_engine import generate_questions
+from modules.question_engine import generate_questions, evaluate_answer
 from modules.proctoring import analyze_frame, get_violation_message
 from database.db import create_session, save_answer, log_violation
 
@@ -229,13 +229,30 @@ def show_interview():
             if not answer.strip():
                 st.warning("Please write an answer before proceeding!")
             else:
+                with st.spinner("🤖 Evaluating your answer..."):
+                    eval_result = evaluate_answer(
+                        questions[current_q], 
+                        answer, 
+                        st.session_state.domain
+                    )
+                    score = eval_result.get("score", 0)
+                    feedback = eval_result.get("feedback", "Evaluation failed.")
+
                 save_answer(
                     st.session_state.session_id,
                     questions[current_q],
                     answer,
-                    score=None
+                    score=score,
+                    feedback=feedback
                 )
-                st.session_state.answers.append(answer)
+                
+                # Store locally for the summary table
+                st.session_state.answers.append({
+                    "question": questions[current_q],
+                    "answer": answer,
+                    "score": score,
+                    "feedback": feedback
+                })
 
                 if current_q + 1 >= total_q:
                     st.session_state.stage = "completed"
@@ -286,6 +303,27 @@ def show_completion():
     else:
         st.success("🎉 No violations detected — clean interview!")
 
+    st.markdown("---")
+    st.markdown("### 📊 Performance Summary")
+    
+    answers_data = st.session_state.get("answers", [])
+    if answers_data:
+        # Calculate average score
+        scores = [ans.get("score", 0) for ans in answers_data]
+        avg_score = sum(scores) / len(scores) if scores else 0
+        
+        st.metric("Average Score", f"{avg_score:.1f}/10")
+        
+        # Display detailed feedback
+        for i, ans in enumerate(answers_data):
+            with st.expander(f"Q{i+1}: {ans['question']}"):
+                st.markdown(f"**Your Answer:** {ans['answer']}")
+                st.markdown(f"**Score:** {ans['score']}/10")
+                st.markdown(f"**Feedback:** {ans['feedback']}")
+    else:
+        st.info("No answers were recorded.")
+
+    st.markdown("---")
     if st.button("🔄 Start New Interview"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]

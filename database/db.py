@@ -29,7 +29,7 @@ def create_session(candidate_name, domain, difficulty):
     return str(result.inserted_id)  # returns session ID
 
 
-def save_answer(session_id, question, answer, score):
+def save_answer(session_id, question, answer, score, feedback=None):
     """Save a candidate's answer to the session."""
     from bson import ObjectId
     sessions_col.update_one(
@@ -38,6 +38,7 @@ def save_answer(session_id, question, answer, score):
             "question": question,
             "answer": answer,
             "score": score,
+            "feedback": feedback,
             "timestamp": datetime.utcnow()
         }}}
     )

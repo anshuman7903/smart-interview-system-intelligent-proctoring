@@ -1,3 +1,4 @@
+import json
 import google.generativeai as genai
 from config.settings import GEMINI_API_KEY
 
@@ -37,3 +38,42 @@ def generate_questions(domain, difficulty, num_questions=5):
     except Exception as e:
         print(f"Error generating questions: {e}")
         return []
+
+def evaluate_answer(question, answer, domain):
+    """Ask Gemini to evaluate the answer and return a score and feedback."""
+    prompt = f"""
+    You are an expert technical interviewer in the '{domain}' domain.
+    Evaluate the candidate's answer to the following question.
+    
+    Question: {question}
+    Candidate's Answer: {answer}
+    
+    Instructions:
+    1. Score the answer out of 10 based on accuracy, completeness, and clarity.
+    2. Provide a short, constructive feedback (1-2 sentences).
+    3. Return ONLY a valid JSON object in this exact format:
+    {{
+        "score": <number>,
+        "feedback": "<string>"
+    }}
+    Do not add any markdown formatting or explanations outside the JSON.
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        
+        # Clean up any markdown block wrappers if Gemini still includes them
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+            
+        result = json.loads(text.strip())
+        return result
+
+    except Exception as e:
+        print(f"Error evaluating answer: {e}")
+        return {"score": 0, "feedback": "AI evaluation failed."}
