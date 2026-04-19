@@ -1,79 +1,98 @@
-import json
 import google.generativeai as genai
 from config.settings import GEMINI_API_KEY
+import json
+import re
 
-# Connect to Gemini AI
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")
 
-def generate_questions(domain, difficulty, num_questions=5):
-    """Ask Gemini to generate interview questions."""
 
-    prompt = f"""
-    Generate {num_questions} interview questions for the domain: {domain}
-    Difficulty level: {difficulty}
-    
-    Return ONLY a numbered list like this:
-    1. Question one here
-    2. Question two here
-    
-    No extra text, no explanations.
-    """
+def generate_questions(domain, difficulty, num_questions=5):
+    """Generate mix of MCQ and text questions."""
+
+    mcq_count  = num_questions // 2
+    text_count = num_questions - mcq_count
+
+    questions = []
+
+    # ── Generate MCQ questions ────────────────────────────────
+    mcq_prompt = f"""
+Generate {mcq_count} multiple choice questions for domain: {domain}
+Difficulty: {difficulty}
+
+Return ONLY a valid JSON array like this:
+[
+  {{
+    "question": "What does Python's GIL stand for?",
+    "options": ["Global Interpreter Lock", "General Input Loop", "Global Input Library", "General Interpreter Lock"],
+    "answer": "Global Interpreter Lock",
+    "type": "mcq"
+  }}
+]
+
+Return ONLY the JSON array. No extra text, no markdown, no backticks.
+"""
 
     try:
-        response = model.generate_content(prompt)
-        raw = response.text.strip()
+        mcq_response = model.generate_content(mcq_prompt)
+        raw = mcq_response.text.strip()
+        raw = re.sub(r"```json|```", "", raw).strip()
+        mcq_list = json.loads(raw)
+        for q in mcq_list:
+            q["type"] = "mcq"
+        questions.extend(mcq_list)
+    except Exception as e:
+        print(f"MCQ generation error: {e}")
 
-        # Convert numbered text into a Python list
-        lines = raw.split("\n")
-        questions = []
-        for line in lines:
+    # ── Generate text questions ───────────────────────────────
+    text_prompt = f"""
+Generate {text_count} descriptive interview questions for domain: {domain}
+Difficulty: {difficulty}
+
+Return ONLY a numbered list:
+1. Question one here
+2. Question two here
+
+No extra text.
+"""
+
+    try:
+        text_response = model.generate_content(text_prompt)
+        raw = text_response.text.strip()
+        for line in raw.split("\n"):
             line = line.strip()
             if line and line[0].isdigit():
                 question = line.split(".", 1)[-1].strip()
-                questions.append(question)
-
-        return questions
-
+                questions.append({
+                    "question": question,
+                    "type"    : "text"
+                })
     except Exception as e:
-        print(f"Error generating questions: {e}")
-        return []
+        print(f"Text question generation error: {e}")
+
+    return questions
+
 
 def evaluate_answer(question, answer, domain):
-    """Ask Gemini to evaluate the answer and return a score and feedback."""
+    """Use Gemini to score a text answer out of 10."""
     prompt = f"""
-    You are an expert technical interviewer in the '{domain}' domain.
-    Evaluate the candidate's answer to the following question.
-    
-    Question: {question}
-    Candidate's Answer: {answer}
-    
-    Instructions:
-    1. Score the answer out of 10 based on accuracy, completeness, and clarity.
-    2. Provide a short, constructive feedback (1-2 sentences).
-    3. Return ONLY a valid JSON object in this exact format:
-    {{
-        "score": <number>,
-        "feedback": "<string>"
-    }}
-    Do not add any markdown formatting or explanations outside the JSON.
-    """
+You are an expert interviewer for {domain}.
 
+Question: {question}
+Candidate's Answer: {answer}
+
+Score this answer out of 10 and give brief feedback.
+Return ONLY valid JSON like this:
+{{"score": 7, "feedback": "Good answer but missing X detail."}}
+
+Return ONLY the JSON. No extra text.
+"""
     try:
         response = model.generate_content(prompt)
-        text = response.text.strip()
-        
-        # Clean up any markdown block wrappers if Gemini still includes them
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.startswith("```"):
-            text = text[3:]
-        if text.endswith("```"):
-            text = text[:-3]
-            
-        result = json.loads(text.strip())
-        return result
-
+        raw      = response.text.strip()
+        raw      = re.sub(r"```json|```", "", raw).strip()
+        result   = json.loads(raw)
+        return result.get("score", 5), result.get("feedback", "No feedback")
     except Exception as e:
-        print(f"Error evaluating answer: {e}")
-        return {"score": 0, "feedback": "AI evaluation failed."}
+        print(f"Evaluation error: {e}")
+        return 5, "Could not evaluate answer"
