@@ -306,14 +306,21 @@ def show_interview():
                     feedback = "Correct! ✅" if score == 10 \
                                else f"Wrong ❌ Correct: {correct}"
                 else:
-                    score    = None
-                    feedback = None
+                    with st.spinner("🤖 AI is evaluating your answer..."):
+                        eval_result = evaluate_answer(
+                            q_text, 
+                            answer, 
+                            st.session_state.domain
+                        )
+                        score = eval_result.get("score", 0)
+                        feedback = eval_result.get("feedback", "Evaluation failed.")
 
                 save_answer(
                     st.session_state.session_id,
                     q_text,
                     answer,
-                    score=score
+                    score=score,
+                    feedback=feedback
                 )
                 st.session_state.answers.append({
                     "question": q_text,
