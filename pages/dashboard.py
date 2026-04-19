@@ -24,8 +24,13 @@ def show():
         # Calculate session average score
         answers = s.get("answers", [])
         if answers:
-            avg_score = sum(ans.get("score", 0) for ans in answers) / len(answers)
-            scores_list.append(avg_score)
+            # Handle None scores (from older sessions) or missing scores
+            valid_scores = [ans.get("score") for ans in answers if isinstance(ans, dict) and ans.get("score") is not None]
+            if valid_scores:
+                avg_score = sum(valid_scores) / len(valid_scores)
+                scores_list.append(avg_score)
+            else:
+                avg_score = 0.0
         else:
             avg_score = 0.0
 
