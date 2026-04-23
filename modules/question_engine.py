@@ -92,7 +92,7 @@ Return ONLY the JSON. No extra text.
         raw      = response.text.strip()
         raw      = re.sub(r"```json|```", "", raw).strip()
         result   = json.loads(raw)
-        return result.get("score", 5), result.get("feedback", "No feedback")
+        return {"score": result.get("score", 5), "feedback": result.get("feedback", "No feedback")}
     except Exception as e:
         print(f"Evaluation error: {e}")
-        return 5, "Could not evaluate answer"
+        return {"score": 5, "feedback": "Could not evaluate answer"}
