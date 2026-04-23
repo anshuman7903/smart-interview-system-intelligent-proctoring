@@ -8,7 +8,7 @@ import cv2
 import av
 import time
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
-from modules.question_engine import generate_questions
+from modules.question_engine import generate_questions, evaluate_answer
 from modules.proctoring import analyze_frame, get_violation_message
 from database.db import create_session, save_answer, log_violation
 
